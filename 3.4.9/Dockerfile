@@ -1,10 +1,5 @@
-FROM openjdk:8-jre-alpine
-MAINTAINER Elisey Zanko <elisey.zanko@gmail.com>
-
-# Install required packages
-RUN apk add --no-cache \
-    bash \
-    su-exec
+FROM owlab/oracle-jdk8-arm64
+MAINTAINER Hun Jae Lee <hunjae.lee@gmail.com>
 
 ENV ZOO_USER zookeeper
 ENV ZOO_CONF_DIR /conf
@@ -13,7 +8,8 @@ ENV ZOO_DATA_LOG_DIR /datalog
 
 # Add a user and make dirs
 RUN set -x \
-    && adduser -D "$ZOO_USER" \
+#    && adduser -D "$ZOO_USER" \
+    && adduser --disabled-password --gecos \"\" "$ZOO_USER" \
     && mkdir -p "$ZOO_DATA_LOG_DIR" "$ZOO_DATA_DIR" "$ZOO_CONF_DIR" \
     && chown "$ZOO_USER:$ZOO_USER" "$ZOO_DATA_LOG_DIR" "$ZOO_DATA_DIR" "$ZOO_CONF_DIR"
 
@@ -22,8 +18,7 @@ ARG DISTRO_NAME=zookeeper-3.4.9
 
 # Download Apache Zookeeper, verify its PGP signature, untar and clean up
 RUN set -x \
-    && apk add --no-cache --virtual .build-deps \
-        gnupg \
+    && apt-get update && apt-get install -y wget \
     && wget -q "http://www.apache.org/dist/zookeeper/$DISTRO_NAME/$DISTRO_NAME.tar.gz" \
     && wget -q "http://www.apache.org/dist/zookeeper/$DISTRO_NAME/$DISTRO_NAME.tar.gz.asc" \
     && export GNUPGHOME="$(mktemp -d)" \
@@ -31,8 +26,7 @@ RUN set -x \
     && gpg --batch --verify "$DISTRO_NAME.tar.gz.asc" "$DISTRO_NAME.tar.gz" \
     && tar -xzf "$DISTRO_NAME.tar.gz" \
     && mv "$DISTRO_NAME/conf/"* "$ZOO_CONF_DIR" \
-    && rm -r "$GNUPGHOME" "$DISTRO_NAME.tar.gz" "$DISTRO_NAME.tar.gz.asc" \
-    && apk del .build-deps
+    && rm -r "$GNUPGHOME" "$DISTRO_NAME.tar.gz" "$DISTRO_NAME.tar.gz.asc"
 
 WORKDIR $DISTRO_NAME
 VOLUME ["$ZOO_DATA_DIR", "$ZOO_DATA_LOG_DIR"]
@@ -44,5 +38,6 @@ ENV PATH $PATH:/$DISTRO_NAME/bin
 ENV ZOOCFGDIR $ZOO_CONF_DIR
 
 COPY docker-entrypoint.sh /
+COPY su-exec /usr/local/bin
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["zkServer.sh", "start-foreground"]
